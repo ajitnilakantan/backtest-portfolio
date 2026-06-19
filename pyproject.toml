@@ -1,0 +1,59 @@
+[project]
+description = "Backtest a stock portfolio"
+name = "backtest-portfolio"
+requires-python = ">=3.12"
+version = "0.1.0"
+dependencies = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.0",
+    "pandas>=3.0.3",
+    "python-dateutil>=2.9.0.post0",
+    "setuptools>=82.0.1",
+    "yfinance>=1.4.1",
+]
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4.0.1",
+  "pytest>=8.3.4",
+  "ruff>=0.8.3",
+  "marimo>=0.13.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# If your code lives in src/my_custom_folder instead of src/[project_name]
+module-name = "backtest"
+
+[tool.pytest.ini_options]
+#pythonpath = ["./src"]
+testpaths = ["tests", "marimo_template"]
+
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E", # pycodestyle
+  "F", # pyflakes
+  "I", # isort
+  "B", # flake8-bugbear
+]
+
+[tool.marimo.ai]
+rules = "- prefer polars over pandas\n- make charts using altair"
+
+[tool.marimo.save]
+autosave = "after_delay"
+autosave_delay = 1000
+format_on_save = true
+
+[tool.marimo.package_management]
+manager = "uv"
+
+[tool.marimo.runtime]
+#pythonpath = ["./src"]
