@@ -12,47 +12,51 @@ Optionally re-balance the holdings yearly.
 
 ### Dependencies
 
-* Python 3.x
-* Jupyter (jupyter-core: 4.6.1+ / jupyter-notebook: 6.0.3+ / jupyter-lab: 1.2.6)
-    * pandas                    1.0.1+
-    * pandas-datareader         0.8.1+
+* uv
+Install from [Astral](https://docs.astral.sh/uv/getting-started/installation/ "Installation instructions")
 
+### Development
 
-### Installing
+* Running tests
+```bash
+uv run pytest
+```
 
-* Clone this project locally
+* Linting
+```bash
+uv run ruff check .  # Run linter
+uv run ruff check . --fix  # Run linter and try to fix warnings
+uv format [--check] # Format code, optionally only check
 
-* With Anaconda
-  * Install Anaconda 3.8+  (anaconda.org)
-    * Install pandas-datareader. From the Terminal:
-      * ```conda install pandas-datareader```
+# FYI:
+uv run ruff linter  # Lists available linters
+uv run ruff analyze graph # Print out dependency graph
+```
 
-* Alternatively, without Anaconda
-  * Install Python 3.x
-  * ```python -m pip install --user pipenv``` # Install virtualenv
-<!--
-  * ```python --version```
-       #Python 3.9.4
-  * ```#python -m pip install --user jupyter matplotlib pandas pandas-datareader```
-  * ```python -m pipenv install jupyter```
-  * ```python -m pipenv install matplotlib pandas pandas-datareader```
-  * ```jupyter notebook Backtest.ipynb``` # Run notebook
--->
+* Check dependencies
+```bash
+uv run --with deptry deptry "$(git rev-parse --show-toplevel)" --config "$(git rev-parse --show-toplevel)/pyproject.toml"
+```
 
-### Executing program
+* Sanitize/check pyproject.toml
+```bash
+uv run --with pytomlcleaner pytomlcleaner
+uv run --with validate-pyproject validate-pyproject pyproject.toml
+```
 
-* With Anaconda
-  * Launch "Anaconda-Navigator"
-  * Launch "JupyterLab" from the Anaconda Navigator front page.
-  * Open ```Backtest.ipynb```
-  * Run All Cells
+### Running program
 
-* Without Anaconda
-  * ```python -m pipenv run jupyter notebook Backtest.ipynb ``` # Activate virtualenv
-  * Run All Cells
-<!--
-  * ```python -m pipenv shell``` # Activate virtualenv
--->
+* Running cli front end
+```bash
+uv run -m main
+```
+
+* Running the Jupyter frontend
+```bash
+# Old "notebook" frontend
+uv run jupyter notebook --notebook-dir=$(git rev-parse --show-toplevel)/notebooks
+# Newer "jupyter lab" frontend
+
 
 ## Help
 
@@ -61,10 +65,15 @@ Optionally re-balance the holdings yearly.
 
 ## Authors
 
-* ajitn
+* ajitnilakantan
 
 ## Version History
 
+* 0.2
+    * Fixed bitrot
+    * Moved to "uv"
+    * Removed Anaconda dependencies
+    * Added marimo front-end
 * 0.1
     * Initial Release
 

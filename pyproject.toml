@@ -1,28 +1,47 @@
 [project]
 description = "Backtest a stock portfolio"
 name = "backtest-portfolio"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 version = "0.1.0"
 dependencies = [
-    "jupyter>=1.1.1",
-    "matplotlib>=3.11.0",
+    "inquirerpy>=0.3.4",
+    "ipython<9",
+    "itables>=2.8.1",
+    "marimo>=0.23.13",
+    "altair>=5",
+    "numpy>=2.4.6",
     "pandas>=3.0.3",
     "python-dateutil>=2.9.0.post0",
-    "setuptools>=82.0.1",
+    "tabulate>=0.10.0",
     "yfinance>=1.4.1",
+    "ipywidgets>=8.1.8",
 ]
 
 [dependency-groups]
 dev = [
-  "pre-commit>=4.0.1",
-  "pytest>=8.3.4",
-  "ruff>=0.8.3",
-  "marimo>=0.13.14",
+    "ipykernel>=7.3.0",
+    "itables>=2.8.1",
+    "jupyter>=1.1.1",
+    "jupyterlab>=4.6.0",
+    "jupyterlab-code-formatter>=3.0.3",
+    "nbformat>=5.10.4",
+    "perspective-python>=4.5.1",
+    "plotly>=6.8.0",
+    "pre-commit>=4.0.1",
+    "pytest>=8.3.4",
+    "ruff>=0.8.3",
+    "setuptools>=82.0.1",
 ]
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.deptry]
+# To avoid: DEP003 'backtest' imported but it is a transitive dependency
+known_first_party = ["backtest"]
+# To avoid:  DEP004 'pytest' imported but declared as a dev dependency
+per_rule_ignores = { DEP004 = ["pytest"] }
 
 [tool.uv.build-backend]
 # If your code lives in src/my_custom_folder instead of src/[project_name]
@@ -34,7 +53,7 @@ testpaths = ["tests", "marimo_template"]
 
 [tool.ruff]
 line-length = 160
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -44,9 +63,6 @@ select = [
   "B", # flake8-bugbear
 ]
 
-[tool.marimo.ai]
-rules = "- prefer polars over pandas\n- make charts using altair"
-
 [tool.marimo.save]
 autosave = "after_delay"
 autosave_delay = 1000
@@ -55,5 +71,10 @@ format_on_save = true
 [tool.marimo.package_management]
 manager = "uv"
 
+[tool.marimo.server]
+browser = "uv run src/open_chromeless_window.py %s"
+# OR if using poetry: 
+# browser = "poetry run python open_chromeless_window.py %s"
+
 [tool.marimo.runtime]
-#pythonpath = ["./src"]
+pythonpath = ["./src"]
