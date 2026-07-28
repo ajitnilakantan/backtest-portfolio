@@ -44,13 +44,13 @@ import itables as itables
 from IPython.display import display, HTML
 
 # HTML
-display({"text/html": HTML('<h1>Hello, world!</h1>').data} , raw=True)
+display({"text/html": HTML("<h1>Hello, world!</h1>").data}, raw=True)
 
 # df
 df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
 styler = df.style
 styler = df.style.format("{:.2f}").highlight_max()
-with pd.option_context('display.notebook_repr_html', True):
+with pd.option_context("display.notebook_repr_html", True):
     display(df)
 
 # Or to display styled df:
@@ -58,7 +58,7 @@ display({"text/html": styler.to_html()}, raw=True)
 
 # itables
 html_output = to_html_datatable(df, style="table-layout:auto;width:auto;margin:0;caption-side:bottom", caption="This is my table caption")
-display({"text/html": html_output} , raw=True)
+display({"text/html": html_output}, raw=True)
 ```
 
 Similarly for matplotlib:
@@ -91,14 +91,15 @@ You can force the notebook backend to hook the HTML repr back up by executing th
 
 ```python
 from IPython.core.interactiveshell import InteractiveShell
+
 # Explicitly re-enable mime processing in the active shell formatter
 ip = InteractiveShell.instance()
-ip.display_formatter.formatters['application/javascript'].enabled = True
-ip.display_formatter.formatters['image/jpeg'].enabled = True
-ip.display_formatter.formatters['image/png'].enabled = True
-ip.display_formatter.formatters['image/svg+xml'].enabled = True
-ip.display_formatter.formatters['text/html'].enabled = True
-ip.display_formatter.formatters['text/markdown'].enabled = True
+ip.display_formatter.formatters["application/javascript"].enabled = True
+ip.display_formatter.formatters["image/jpeg"].enabled = True
+ip.display_formatter.formatters["image/png"].enabled = True
+ip.display_formatter.formatters["image/svg+xml"].enabled = True
+ip.display_formatter.formatters["text/html"].enabled = True
+ip.display_formatter.formatters["text/markdown"].enabled = True
 ```
 
 ## Inline matplot lib

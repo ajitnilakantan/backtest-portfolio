@@ -8,11 +8,14 @@ import pandas as pd
 import pytest
 
 from backtest.backtest import (
+    _allocate_shares_in_portfolio,
     _download_yahoo_finance_data,
     _normalize_percentage,
-    download_portfolio_history,
-    rebalance_portfolio,
-    shares_in_portfolio,
+    _rebalance_portfolio,
+    download_portfolio,
+    get_numrebalancedshares_column,
+    get_numshares_column,
+    portfolio_value,
 )
 from backtest.holding import Holding, Portfolio, PortfolioType
 
@@ -23,269 +26,204 @@ class TestHolding:
     """Tests for the Holding dataclass."""
 
     def test_holding_fields(self):
-        """Holding has ticker and value fields."""
         h = Holding("AAPL", 60)
         assert h.ticker == "AAPL"
         assert h.value == 60
 
     def test_holding_equality(self):
-        """Two Holdings with same fields are equal."""
-        h1 = Holding("AAPL", 60)
-        h2 = Holding("AAPL", 60)
-        assert h1 == h2
+        assert Holding("AAPL", 60) == Holding("AAPL", 60)
 
     def test_holding_inequality(self):
-        """Holdings with different fields are not equal."""
-        h1 = Holding("AAPL", 60)
-        h2 = Holding("MSFT", 40)
-        assert h1 != h2
+        assert Holding("AAPL", 60) != Holding("MSFT", 40)
 
 
 class TestNormalizePercentage:
-    """Tests for _normalize_percentage."""
+    """Tests for percentage normalization."""
 
-    @pytest.fixture
-    def portfolio_100(self):
-        """Portfolio with percentages summing to 100."""
-        return Portfolio(
+    @pytest.mark.parametrize(
+        ("values", "expected_aapl"),
+        [
+            ((60, 40), 60.0),
+            ((80, 40), 80 * 100 / 120),
+            ((30, 20), 60.0),
+        ],
+    )
+    def test_normalizes_holdings_to_100(self, values, expected_aapl):
+        portfolio = Portfolio(
+            name="Normalization Test",
             type=PortfolioType.PERCENT,
-            holdings=[
-                Holding("AAPL", 60),
-                Holding("MSFT", 40),
-            ],
+            holdings=[Holding("AAPL", values[0]), Holding("MSFT", values[1])],
         )
 
-    @pytest.fixture
-    def portfolio_over_100(self):
-        """Portfolio with percentages summing to more than 100."""
-        return Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[
-                Holding("AAPL", 80),
-                Holding("MSFT", 40),
-            ],
-        )
+        aapl = _normalize_percentage(portfolio, "AAPL")
+        msft = _normalize_percentage(portfolio, "MSFT")
 
-    @pytest.fixture
-    def portfolio_under_100(self):
-        """Portfolio with percentages summing to less than 100."""
-        return Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[
-                Holding("AAPL", 30),
-                Holding("MSFT", 20),
-            ],
-        )
-
-    def test_exact_100(self, portfolio_100):
-        """Normalized values equal raw percentages when total is 100."""
-        assert _normalize_percentage(portfolio_100, "AAPL") == pytest.approx(60.0)
-        assert _normalize_percentage(portfolio_100, "MSFT") == pytest.approx(40.0)
-
-    def test_over_100(self, portfolio_over_100):
-        """Normalized values sum to 100 when raw total exceeds 100."""
-        aapl = _normalize_percentage(portfolio_over_100, "AAPL")
-        msft = _normalize_percentage(portfolio_over_100, "MSFT")
-        assert aapl + msft == pytest.approx(100.0)
-        assert aapl == pytest.approx(80 * 100 / 120)
-
-    def test_under_100(self, portfolio_under_100):
-        """Normalized values sum to 100 when raw total is below 100."""
-        aapl = _normalize_percentage(portfolio_under_100, "AAPL")
-        msft = _normalize_percentage(portfolio_under_100, "MSFT")
+        assert aapl == pytest.approx(expected_aapl)
         assert aapl + msft == pytest.approx(100.0)
 
 
 class TestDownloadYahooFinanceData:
-    """Tests for _download_yahoo_finance_data (mocked)."""
+    """Tests for the Yahoo Finance boundary."""
 
     def test_returns_dataframe_with_ticker_column(self):
-        """Returns a DataFrame with required columns."""
         start = datetime(2020, 1, 1, tzinfo=EST)
         end = datetime(2020, 1, 10, tzinfo=EST)
 
         with patch("backtest.backtest.yf.Ticker") as mock_ticker:
             mock_instance = MagicMock()
-            idx = pd.date_range("2020-01-02", periods=5, freq="B", tz="UTC")
+            index = pd.date_range("2020-01-02", periods=5, freq="B", tz="UTC")
             mock_instance.history.return_value = pd.DataFrame(
                 {
                     "Open": [150.0] * 5,
                     "High": [152.0] * 5,
                     "Low": [149.0] * 5,
                     "Close": [151.0] * 5,
-                    "Volume": [1000000] * 5,
-                    "Dividends": [0.0] * 5,
-                    "Stock Splits": [0.0] * 5,
+                    "Volume": [1_000_000] * 5,
                 },
-                index=idx,
+                index=index,
             )
             mock_ticker.return_value = mock_instance
 
-            df = _download_yahoo_finance_data("AAPL", start, end)
+            result = _download_yahoo_finance_data("AAPL", start, end)
 
-        assert "Ticker" in df.columns
-        assert (df["Ticker"] == "AAPL").all()
-        assert not df.empty
+        mock_ticker.assert_called_once_with("AAPL")
+        assert not result.empty
+        assert (result["Ticker"] == "AAPL").all()
+        assert str(result.index.tz) == "UTC"
 
 
-class TestDownloadPortfolioHistory:
-    """Tests for download_portfolio_history (mocked yfinance)."""
+class TestDownloadPortfolio:
+    """Tests for the integrated portfolio download pipeline."""
 
-    def _make_mock_history(self, ticker, start, end):
-        """Create a mock yfinance history DataFrame."""
-        dates = pd.date_range(start, end, freq="B", tz="UTC")
-        df = pd.DataFrame(
+    @staticmethod
+    def _history(ticker, start, end):
+        index = pd.date_range(pd.Timestamp(start).tz_convert("UTC"), pd.Timestamp(end).tz_convert("UTC"), freq="D")
+        close = 150.0 if ticker == "AAPL" else 200.0
+        return pd.DataFrame(
             {
-                "Open": [100.0 + i for i in range(len(dates))],
-                "High": [102.0 + i for i in range(len(dates))],
-                "Low": [99.0 + i for i in range(len(dates))],
-                "Close": [101.0 + i for i in range(len(dates))],
-                "Volume": [1000000] * len(dates),
-                "Dividends": [0.0] * len(dates),
-                "Stock Splits": [0.0] * len(dates),
+                "Open": close,
+                "High": close,
+                "Low": close,
+                "Close": close,
+                "Volume": 1_000_000,
+                "Ticker": ticker,
             },
-            index=dates,
+            index=index,
         )
-        return df
 
-    def test_returns_portfolio_data(self, sample_portfolio, sample_dates):
-        """Returns a DataFrame with one column per ticker."""
+    def test_returns_integrated_portfolio_data(self, sample_portfolio, sample_dates):
         start, end = sample_dates
 
-        with patch("backtest.backtest.yf.Ticker") as mock_ticker:
-            mock_instance = MagicMock()
-            mock_instance.history.side_effect = lambda start, end: self._make_mock_history("AAPL", start, end)
-            mock_ticker.return_value = mock_instance
+        with (
+            patch("backtest.backtest.DbCache") as cache_class,
+            patch("backtest.backtest._download_yahoo_finance_data") as download,
+        ):
+            cache = cache_class.return_value
+            cache.get_min_max_dates.return_value = (None, None)
+            download.side_effect = lambda ticker, first, last: self._history(ticker, first, last)
 
-            with patch("backtest.backtest.DbCache") as mock_cache_cls:
-                mock_cache = MagicMock()
-                mock_cache.get_min_max_dates.return_value = (None, None)
-                mock_cache.get_cache_data.side_effect = lambda ticker, s, e: self._make_mock_history(ticker, s, e)
-                mock_cache.cache_data.return_value = True
-                mock_cache_cls.return_value = mock_cache
+            result = download_portfolio(sample_portfolio, start, end, initial_investment=100_000)
 
-                data = download_portfolio_history(
-                    sample_portfolio, start, end, _initial_investment=100_000, _usd_cad=1.3
-                )
+        required_columns = {
+            "AAPL",
+            "MSFT",
+            get_numshares_column("AAPL"),
+            get_numshares_column("MSFT"),
+            get_numrebalancedshares_column("AAPL"),
+            get_numrebalancedshares_column("MSFT"),
+        }
+        assert required_columns <= set(result.columns)
+        assert result.index.is_monotonic_increasing
+        assert not result[sorted(required_columns)].isna().any().any()
+        assert result[get_numshares_column("AAPL")].iloc[0] == pytest.approx(400.0)
+        assert result[get_numshares_column("MSFT")].iloc[0] == pytest.approx(200.0)
+        assert download.call_count == 2
+        assert cache.cache_data.call_count == 2
 
-        # Should have one column per ticker
-        assert list(data.columns) == ["AAPL", "MSFT"]
-        assert len(data) > 0
 
+class TestAllocateSharesInPortfolio:
+    """Tests for initial share allocation in integrated data."""
 
-class TestSharesInPortfolio:
-    """Tests for shares_in_portfolio."""
-
-    def test_returns_shares_dataframe(self, sample_portfolio, sample_dates):
-        """Returns a DataFrame with initial share allocation."""
+    def test_adds_and_fills_share_columns(self, sample_portfolio, sample_dates):
         start, end = sample_dates
+        index = pd.date_range(start, end, freq="W-FRI")
+        prices = pd.DataFrame({"AAPL": 150.0, "MSFT": 200.0}, index=index)
 
-        # Build a simple prices DataFrame
-        idx = pd.date_range(start, end, freq="W-FRI")
-        data = pd.DataFrame(
-            {"AAPL": [150.0] * len(idx), "MSFT": [200.0] * len(idx)},
-            index=idx,
-        )
+        result = _allocate_shares_in_portfolio(sample_portfolio, prices, start, end, 100_000, 1.3)
 
-        shares = shares_in_portfolio(
-            sample_portfolio, data, start, end, initial_investment=100_000, _usd_cad=1.3
-        )
-
-        assert list(shares.columns) == ["AAPL", "MSFT"]
-        assert start in shares.index
-        # 60% of 100000 / 150 = 400 shares AAPL
-        assert shares.loc[start, "AAPL"] == pytest.approx(400.0)
-        # 40% of 100000 / 200 = 200 shares MSFT
-        assert shares.loc[start, "MSFT"] == pytest.approx(200.0)
+        assert list(result[["AAPL", "MSFT"]].columns) == ["AAPL", "MSFT"]
+        assert (result[get_numshares_column("AAPL")] == pytest.approx(400.0)).all()
+        assert (result[get_numshares_column("MSFT")] == pytest.approx(200.0)).all()
 
 
 class TestRebalancePortfolio:
-    """Tests for rebalance_portfolio."""
+    """Tests for annual rebalancing in integrated data."""
 
-    def _make_simple_prices(self, dates, tickers, base_prices):
-        """Build a prices DataFrame."""
-        idx = pd.date_range(dates[0], dates[-1], freq="W-FRI")
-        data = {}
-        for i, ticker in enumerate(tickers):
-            data[ticker] = [base_prices[i]] * len(idx)
-        return pd.DataFrame(data, index=idx)
-
-    def _make_simple_shares(self, tickers, date, shares):
-        """Build a shares DataFrame with one row."""
-        index = pd.date_range(datetime.now().date(), periods=0, freq="W")
-        df = pd.DataFrame(index=index, columns=tickers)
-        df.loc[date] = shares
-        return df
-
-    def test_adds_yearly_rows(self):
-        """Rebalancing adds a row for each year-end."""
-        start = datetime(2020, 6, 1, tzinfo=EST)
-        end = datetime(2022, 6, 1, tzinfo=EST)
-
-        portfolio = Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[Holding("AAPL", 60), Holding("MSFT", 40)],
+    @staticmethod
+    def _portfolio_data(start, end, aapl_prices, msft_prices, aapl_shares=400.0, msft_shares=200.0):
+        index = pd.date_range(start, end, freq="W-FRI")
+        data = pd.DataFrame(
+            {
+                "AAPL": aapl_prices(index),
+                "MSFT": msft_prices(index),
+                get_numshares_column("AAPL"): aapl_shares,
+                get_numshares_column("MSFT"): msft_shares,
+            },
+            index=index,
         )
-        prices = self._make_simple_prices([start, end], ["AAPL", "MSFT"], [150.0, 200.0])
-        shares = self._make_simple_shares(["AAPL", "MSFT"], start, [400.0, 200.0])
+        return data
 
-        result = rebalance_portfolio(portfolio, prices, shares, start, end)
-
-        # Should have original row + 2 year-end rows (2020-12-31, 2021-12-31)
-        assert len(result) >= 3  # original + 2 year-ends
-        # Year-end rows should exist
-        year_end_2020 = datetime(2020, 12, 31, tzinfo=EST)
-        year_end_2021 = datetime(2021, 12, 31, tzinfo=EST)
-        assert year_end_2020 in result.index
-        assert year_end_2021 in result.index
-
-    def test_no_rebalance_short_period(self):
-        """No rebalance rows added when period is less than a year."""
-        start = datetime(2020, 6, 1, tzinfo=EST)
-        end = datetime(2020, 11, 1, tzinfo=EST)  # < 1 year
-
-        portfolio = Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[Holding("AAPL", 100)],
-        )
-        prices = self._make_simple_prices([start, end], ["AAPL"], [150.0])
-        shares = self._make_simple_shares(["AAPL"], start, [100.0])
-
-        result = rebalance_portfolio(portfolio, prices, shares, start, end)
-
-        # Only the original row should exist
-        assert len(result) == 1
-
-    def test_preserves_original_shares(self):
-        """Original share allocation is unchanged in rebalanced result."""
+    def test_rebalances_to_target_weights_without_adding_rows(self, sample_portfolio):
         start = datetime(2020, 6, 1, tzinfo=EST)
         end = datetime(2021, 6, 1, tzinfo=EST)
-
-        portfolio = Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[Holding("AAPL", 100)],
+        data = self._portfolio_data(
+            start,
+            end,
+            lambda index: [150.0 + i * 2 for i in range(len(index))],
+            lambda index: [200.0] * len(index),
         )
-        prices = self._make_simple_prices([start, end], ["AAPL"], [150.0])
-        shares = self._make_simple_shares(["AAPL"], start, [666.666])
+        original_index = data.index.copy()
 
-        result = rebalance_portfolio(portfolio, prices, shares, start, end)
+        result = _rebalance_portfolio(sample_portfolio, data, start, end)
 
-        # Original shares at start should be unchanged
-        assert result.loc[start, "AAPL"] == pytest.approx(666.666)
+        pd.testing.assert_index_equal(result.index, original_index)
+        year_end = datetime(2020, 12, 31, tzinfo=EST)
+        rebalance_date = result.index[result.index.get_indexer([year_end], method="nearest")[0]]
+        aapl_value, _ = portfolio_value(sample_portfolio, result, True, rebalance_date, "AAPL")
+        msft_value, _ = portfolio_value(sample_portfolio, result, True, rebalance_date, "MSFT")
+        assert aapl_value / (aapl_value + msft_value) == pytest.approx(0.6, abs=0.005)
+        assert msft_value / (aapl_value + msft_value) == pytest.approx(0.4, abs=0.005)
 
-    def test_rebalance_single_holding_all_in(self):
-        """Single holding at 100% keeps same ratio after rebalance."""
+    def test_short_period_keeps_initial_allocation(self, sample_portfolio):
+        start = datetime(2020, 6, 1, tzinfo=EST)
+        end = datetime(2020, 11, 1, tzinfo=EST)
+        data = self._portfolio_data(start, end, lambda index: [150.0] * len(index), lambda index: [200.0] * len(index))
+
+        result = _rebalance_portfolio(sample_portfolio, data, start, end)
+
+        assert (result[get_numrebalancedshares_column("AAPL")] == result[get_numshares_column("AAPL")]).all()
+        assert (result[get_numrebalancedshares_column("MSFT")] == result[get_numshares_column("MSFT")]).all()
+
+    def test_preserves_original_share_columns(self, sample_portfolio):
         start = datetime(2020, 6, 1, tzinfo=EST)
         end = datetime(2021, 6, 1, tzinfo=EST)
+        data = self._portfolio_data(start, end, lambda index: [150.0] * len(index), lambda index: [200.0] * len(index))
+        original_aapl = data[get_numshares_column("AAPL")].copy()
+        original_msft = data[get_numshares_column("MSFT")].copy()
 
-        portfolio = Portfolio(
-            type=PortfolioType.PERCENT,
-            holdings=[Holding("QQQ", 100)],
-        )
-        prices = self._make_simple_prices([start, end], ["QQQ"], [300.0])
-        shares = self._make_simple_shares(["QQQ"], start, [333.333])
+        result = _rebalance_portfolio(sample_portfolio, data, start, end)
 
-        result = rebalance_portfolio(portfolio, prices, shares, start, end)
+        pd.testing.assert_series_equal(result[get_numshares_column("AAPL")], original_aapl)
+        pd.testing.assert_series_equal(result[get_numshares_column("MSFT")], original_msft)
 
-        assert "QQQ" in result.columns
-        assert len(result) > 1
+    def test_single_holding_remains_fully_invested(self):
+        start = datetime(2020, 6, 1, tzinfo=EST)
+        end = datetime(2021, 6, 1, tzinfo=EST)
+        portfolio = Portfolio(name="QQQ Only", type=PortfolioType.PERCENT, holdings=[Holding("QQQ", 100)])
+        index = pd.date_range(start, end, freq="W-FRI")
+        data = pd.DataFrame({"QQQ": 300.0, get_numshares_column("QQQ"): 333.333}, index=index)
+
+        result = _rebalance_portfolio(portfolio, data, start, end)
+
+        pd.testing.assert_index_equal(result.index, index)
+        assert (result[get_numrebalancedshares_column("QQQ")] == pytest.approx(333.333)).all()

@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
+from backtest.backtest import get_numrebalancedshares_column, get_numshares_column
 from backtest.db_cache import DbCache
 from backtest.holding import Holding, Portfolio, PortfolioType
 
@@ -46,29 +47,21 @@ def sample_dates():
 
 
 @pytest.fixture
-def sample_prices_df(sample_dates):
-    """Weekly closing prices for AAPL and MSFT over a year."""
+def sample_portfolio_data(sample_dates):
+    """Integrated weekly prices and share allocations for a sample portfolio."""
     start, end = sample_dates
-    idx = pd.date_range(start, end, freq="W-FRI")
-    data = {
-        "AAPL": [150.0 + i * 0.5 for i in range(len(idx))],
-        "MSFT": [200.0 + i * 0.3 for i in range(len(idx))],
-    }
-    return pd.DataFrame(data, index=idx)
-
-
-@pytest.fixture
-def sample_num_shares(sample_portfolio, sample_dates):
-    """Initial share allocation DataFrame."""
-    start, _ = sample_dates
-    index = pd.date_range(datetime.now().date(), periods=0, freq="W")
-    columns = [fund.ticker for fund in sample_portfolio.holdings]
-    df = pd.DataFrame(index=index, columns=columns)
-    # 100000 investment at close prices: AAPL=150, MSFT=200
-    # 60% → 60000 / 150 = 400 shares AAPL
-    # 40% → 40000 / 200 = 200 shares MSFT
-    df.loc[start] = [400.0, 200.0]
-    return df
+    index = pd.date_range(start, end, freq="W-FRI")
+    return pd.DataFrame(
+        {
+            "AAPL": [150.0 + i * 0.5 for i in range(len(index))],
+            "MSFT": [200.0 + i * 0.3 for i in range(len(index))],
+            get_numshares_column("AAPL"): 400.0,
+            get_numshares_column("MSFT"): 200.0,
+            get_numrebalancedshares_column("AAPL"): 400.0,
+            get_numrebalancedshares_column("MSFT"): 200.0,
+        },
+        index=index,
+    )
 
 
 @pytest.fixture
@@ -78,4 +71,19 @@ def benchmark_portfolio():
         name="S&P 500 Benchmark",
         type=PortfolioType.PERCENT,
         holdings=[Holding("^GSPC", 100)],
+    )
+
+
+@pytest.fixture
+def sample_benchmark_data(sample_dates):
+    """Integrated weekly prices and share allocations for the benchmark."""
+    start, end = sample_dates
+    index = pd.date_range(start, end, freq="W-FRI")
+    return pd.DataFrame(
+        {
+            "^GSPC": [4000.0 + i * 2 for i in range(len(index))],
+            get_numshares_column("^GSPC"): 25.0,
+            get_numrebalancedshares_column("^GSPC"): 25.0,
+        },
+        index=index,
     )

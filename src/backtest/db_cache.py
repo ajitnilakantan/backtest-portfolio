@@ -11,11 +11,13 @@ import pandas as pd
 
 class NullContextManager:
     """A safe placeholder context manager that does nothing and returns None."""
+
     def __enter__(self) -> None:
         return None
-        
+
     def __exit__(self, _exc_type, _exc_val, _exc_tb) -> bool:
-        return True # Suppresses errors inside the block if they occur
+        return True  # Suppresses errors inside the block if they occur
+
 
 class DbCache:
     """SQLite cache for Yahoo Finance daily data."""
@@ -37,17 +39,17 @@ class DbCache:
         return self._conn
 
     def __enter__(self):
-        """ To implement "with" """
+        """To implement "with" """
         # Establish the connection file handle
         self._conn = sqlite3.connect(self._db_path)
-        
+
         # Run the table initialization immediately
         self._init_db()
-        
+
         return self
 
     def __exit__(self, _exc_type, _exc_val, _exc_tb):
-        """ Cleanup at the end of "with" """
+        """Cleanup at the end of "with" """
         if self._conn:
             self._conn.close()
 
@@ -104,71 +106,104 @@ class DbCache:
         return True
 
     def get_cache_data(self, ticker: str, min_date: datetime, max_date: datetime) -> pd.DataFrame:
+        """Retrieve cached Yahoo Finance data for a ticker between dates.
+
+        Queries the SQLite cache for historical price data filtered by ticker symbol
+        and date range. Returns a DataFrame with columns: Date, Ticker, High, Low,
+        Open, Close, Volume.
+
+        Args:
+            ticker: Stock ticker symbol (e.g., 'AAPL').
+            min_date: Minimum date to query (inclusive).
+            max_date: Maximum date to query (inclusive).
+
+        Returns:
+            pandas.DataFrame: Cached data with date range and columns matching
+            Yahoo Finance API response structure. Empty DataFrame if no data found
+            or cache miss.
+
+        Notes:
+            - Data is retrieved as-is from cache without recomputation
+            - Returns empty DataFrame for ticker without cached history
+            - Results include date, OHLC prices, and volume information
+        """
         with self.conn as active_conn:
             if active_conn is None:
-                return pd.DataFrame() # Completely empty DataFrame (0 rows, 0 columns)
+                return pd.DataFrame()  # Completely empty DataFrame (0 rows, 0 columns)
             query = """SELECT Date, Ticker, High, Low, Open, Close, Volume
                        FROM yahoo_daily
                        WHERE Ticker = ?
-                       AND Date BETWEEN ? AND ?
-                       ORDER BY DATE(Date) ASC"""
-            df = pd.read_sql_query(
-                sql=query,
-                con=active_conn,
-                params=[ticker, min_date.isoformat(), max_date.isoformat()],
-                index_col="Date",
-                parse_dates={"Date": "%Y-%m-%dT%H:%M:%S%z"},
-            )
+                         AND Date BETWEEN ? AND ?
+                       ORDER BY Date ASC"""
+            df = pd.read_sql_query(sql=query, con=active_conn, params=[ticker, min_date, max_date])
             return df
 
     def cache_data(self, df: pd.DataFrame) -> bool:
+        """Cache Yahoo Finance data in SQLite database.
+
+        Stores DataFrame containing historical price data in the sqlite cache.
+        Inserts or updates records based on Date and Ticker combination to ensure
+        latest data is retained.
+
+        Args:
+            df: pandas.DataFrame containing price data with columns:
+                Date, Ticker, High, Low, Open, Close, Volume
+                DataFrame must have a DatetimeIndex.
+
+        Returns:
+            bool: True if cache write succeeded, False if failed or no data.
+
+        Notes:
+            - Data is written using UPSERT pattern (INSERT OR REPLACE)
+            - Ensures unique constraint on (Date, Ticker) is respected
+            - Returns False for empty DataFrames or write errors
+        """
         with self.conn as active_conn:
             if active_conn is None:
                 return False
-
-            zip_rows = zip(
-                df.index,
-                df["Ticker"],
-                df["High"],
-                df["Low"],
-                df["Open"],
-                df["Close"],
-                df["Volume"],
-                strict=True,
+            if df.empty:
+                return False
+            # Ensure Date column exists from the index (as string for SQLite)
+            df_to_cache = df.copy()
+            df_to_cache["Date"] = df_to_cache.index.astype(str)
+            rows = df_to_cache[["Date", "Ticker", "High", "Low", "Open", "Close", "Volume"]].values.tolist()
+            active_conn.executemany(
+                "INSERT OR REPLACE INTO yahoo_daily (Date, Ticker, High, Low, Open, Close, Volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rows,
             )
-            rows = [
-                (
-                    row[0].isoformat(),
-                    row[1],
-                    row[2],
-                    row[3],
-                    row[4],
-                    row[5],
-                    row[6],
-                )
-                for row in zip_rows
-            ]
-
-            query = "INSERT OR REPLACE INTO yahoo_daily (Date, Ticker, High, Low, Open, Close, Volume) VALUES(?,?,?,?,?,?,?);"
-            active_conn.executemany(query, rows)
-        return True
-
+            return True
 
     def get_min_max_dates(self, ticker: str) -> tuple[datetime | None, datetime | None]:
+        """Get earliest and latest cached dates for a ticker.
+
+        Queries the database to find the minimum and maximum cached dates for a
+        specific ticker symbol. Useful for determining data availability and
+        incrementally fetching new data.
+
+        Args:
+            ticker: Stock ticker symbol (e.g., 'AAPL').
+
+        Returns:
+            tuple[datetime, datetime] or None: Pair of (min_date, max_date) if
+            cached data exists, otherwise (None, None). Min and max dates are
+            inclusive values from cache.
+
+        Notes:
+            - Returns (None, None) for ticker with no cached history
+            - Use this method before incremental data fetching
+            - Dates are returned in the format stored in cache (UTC)
+        """
         with self.conn as active_conn:
             if active_conn is None:
                 return (None, None)
-
-            query = "SELECT Min(Date), Max(Date) from yahoo_daily where Ticker = ?"
-            cursor = active_conn.cursor()
-            a = cursor.execute(query, (ticker,)).fetchall()
-            cursor.close()
-            min_date = None
-            max_date = None
-            if a and a[0] and a[0][0]:
-                min_date = datetime.strptime(a[0][0], "%Y-%m-%dT%H:%M:%S%z")
-            if a and a[0] and a[0][1]:
-                max_date = datetime.strptime(a[0][1], "%Y-%m-%dT%H:%M:%S%z")
+            query = """SELECT MIN(Date) as min_date, MAX(Date) as max_date
+                       FROM yahoo_daily
+                       WHERE Ticker = ?"""
+            result = pd.read_sql_query(query, active_conn, params=[ticker,])
+            if result.empty or result.iloc[0]["min_date"] is None:
+                return (None, None)
+            min_date = pd.to_datetime(result.iloc[0]["min_date"]).to_pydatetime()
+            max_date = pd.to_datetime(result.iloc[0]["max_date"]).to_pydatetime()
             return (min_date, max_date)
 
     def set_kv(self, key: str, value: str):
@@ -176,10 +211,7 @@ class DbCache:
         with self.conn as active_conn:
             if active_conn is None:
                 return
-            active_conn.execute(
-                    "INSERT OR REPLACE INTO configuration (key, value) VALUES (?, ?)",
-                    (key, value)
-                )
+            active_conn.execute("INSERT OR REPLACE INTO configuration (key, value) VALUES (?, ?)", (key, value))
 
     def get_kv(self, key: str, default=None) -> str | None:
         """Retrieve a value by its key. Returns default if not found."""
@@ -187,10 +219,7 @@ class DbCache:
             with self.conn as active_conn:
                 if active_conn is None:
                     return default
-                cursor = active_conn.execute(
-                    "SELECT value FROM configuration WHERE key = ?", 
-                    (key,)
-                )
+                cursor = active_conn.execute("SELECT value FROM configuration WHERE key = ?", (key,))
                 row = cursor.fetchone()
                 return row[0] if row else default
         except sqlite3.OperationalError:

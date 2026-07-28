@@ -1,36 +1,37 @@
 [project]
 description = "Backtest a stock portfolio"
-name = "backtest-portfolio"
+name = "backtest"
 requires-python = ">=3.14"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+    "altair>=6.2.2",
     "inquirerpy>=0.3.4",
-    "ipython<9",
-    "itables>=2.8.1",
-    "marimo>=0.23.13",
-    "altair>=5",
-    "numpy>=2.4.6",
-    "pandas>=3.0.3",
+    "ipython>=9.15.0",
+    "ipywidgets>=8.1.8",
+    "itables>=2.9.1",
+    "marimo>=0.23.15",
+    "numpy>=2.5.1",
+    "pandas>=3.0.2",
     "python-dateutil>=2.9.0.post0",
     "tabulate>=0.10.0",
-    "yfinance>=1.4.1",
-    "ipywidgets>=8.1.8",
+    "yfinance>=1.5.2",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
-    "itables>=2.8.1",
+    "itables>=2.9.1",
     "jupyter>=1.1.1",
-    "jupyterlab>=4.6.0",
     "jupyterlab-code-formatter>=3.0.3",
+    "jupyterlab>=4.6.2",
     "nbformat>=5.10.4",
-    "perspective-python>=4.5.1",
-    "plotly>=6.8.0",
-    "pre-commit>=4.0.1",
-    "pytest>=8.3.4",
-    "ruff>=0.8.3",
-    "setuptools>=82.0.1",
+    "perspective-python>=4.5.2",
+    "plotly>=6.9.0",
+    "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.0",
+    "setuptools>=83.0.0",
+    "voici-core>=0.10.0",
 ]
 
 [build-system]
@@ -73,8 +74,6 @@ manager = "uv"
 
 [tool.marimo.server]
 browser = "uv run src/open_chromeless_window.py %s"
-# OR if using poetry: 
-# browser = "poetry run python open_chromeless_window.py %s"
 
 [tool.marimo.runtime]
 pythonpath = ["./src"]
