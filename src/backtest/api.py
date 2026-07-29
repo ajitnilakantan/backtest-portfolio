@@ -74,17 +74,18 @@ class Backtest:
         # Baseline benchmark
         if not benchmark_portfolio:
             benchmark_portfolio = default_benchmark_portfolios[0]
+        # Download data
+        benchmark_data = Backtest.download_portfolio(benchmark_portfolio, start, end, initial_investment, usd_cad)
+
         portfolios: list[Portfolio] = [p for p in portfolios if p is not None]  # filter out Nones
-        portfolio = portfolios[0]
 
         # Download data
-        portfolio_data = Backtest.download_portfolio(portfolio, start, end, initial_investment, usd_cad)
-        benchmark_data = Backtest.download_portfolio(benchmark_portfolio, start, end, initial_investment, usd_cad)
+        portfolios_data = [Backtest.download_portfolio(portfolio, start, end, initial_investment, usd_cad) for portfolio in portfolios]
 
         # Display results and chart
         Backtest.display_results(
-            portfolio,
-            portfolio_data,
+            portfolios,
+            portfolios_data,
             benchmark_portfolio,
             benchmark_data,
             start,
@@ -122,8 +123,8 @@ class Backtest:
 
     @staticmethod
     def display_results(
-        portfolio: Portfolio,
-        portfolio_data: pd.DataFrame,
+        portfolios: list[Portfolio],
+        portfolios_data: list[pd.DataFrame],
         benchmark_portfolio: Portfolio,
         benchmark_data: pd.DataFrame,
         start: datetime,
@@ -157,8 +158,8 @@ class Backtest:
         start = datetime_nyc(start)
         end = datetime_nyc(end)
         return plot_results(
-            portfolio,
-            portfolio_data,
+            portfolios,
+            portfolios_data,
             benchmark_portfolio,
             benchmark_data,
             start,

@@ -68,6 +68,9 @@ uv run -m main
 
 * Running the Jupyter frontend
 ```bash
+# Run the project without the code cells
+uv run voila "$(git rev-parse --show-toplevel)/notebooks/Backtest.ipynb"
+
 # Old "notebook" frontend
 uv run jupyter notebook --notebook-dir="$(git rev-parse --show-toplevel)/notebooks" "$(git rev-parse --show-toplevel)/notebooks/Backtest.ipynb"
 
@@ -77,7 +80,7 @@ uv run jupyter lab --notebook-dir="$(git rev-parse --show-toplevel)/notebooks" "
 
 * Running the Marimo frontend
 ```bash
-uv run marimo run  notebooks/backtest_marimo.py
+uv run marimo run --sandbox notebooks/backtest_marimo.py
 ```
 ## Notes
 

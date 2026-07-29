@@ -144,8 +144,8 @@ def _print_holdings_table(
 
 
 def plot_results(
-    portfolio: Portfolio,
-    portfolio_data: pd.DataFrame,
+    portfolios: list[Portfolio],
+    portfolios_data: list[pd.DataFrame],
     benchmark_portfolio: Portfolio,
     benchmark_data: pd.DataFrame,
     start: datetime,
@@ -177,55 +177,64 @@ def plot_results(
         Shows chart using browser renderer in CLI environments.
     """
 
-    # Compute totals
-    portfolio_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=False, at_date=end)
-    rebalanced_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=True, at_date=end)
-    benchmark_result_total, _ = portfolio_value(benchmark_portfolio, benchmark_data, rebalanced=False, at_date=end)
+    assert(len(portfolios) == len(portfolios_data))
 
-    # Print summary stats
-    print(f"===Portfolio: {portfolio.name}===")
-    print(f"From {start.date()} to {end.date()}")
-    print("")
+    for portfolio, portfolio_data in zip(portfolios, portfolios_data, strict=True):
+        # Compute totals
+        portfolio_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=False, at_date=end)
+        rebalanced_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=True, at_date=end)
+        benchmark_result_total, _ = portfolio_value(benchmark_portfolio, benchmark_data, rebalanced=False, at_date=end)
 
-    print(f"Initial Investment         = ${initial_investment:10,.2f}")
-    print(f"Total S&P 500 Benchmark    = ${benchmark_result_total:10,.2f}", end="")
-    _print_stats(initial_investment, benchmark_result_total, start, end)
-    print(f"Total Portfolio            = ${portfolio_result_total:10,.2f}", end="")
-    _print_stats(initial_investment, portfolio_result_total, start, end)
-    print(f"Total Portfolio Rebalanced = ${rebalanced_result_total:10,.2f}", end="")
-    _print_stats(initial_investment, rebalanced_result_total, start, end)
-    print("Holdings:")
+        # Print summary stats
+        print(f"===Portfolio: {portfolio.name}===")
+        print(f"From {start.date()} to {end.date()}")
+        print("")
 
-    # Print holdings table
-    _print_holdings_table(
-        portfolio,
-        portfolio_data,
-        start,
-        end,
-        initial_investment,
-    )
+        print(f"Initial Investment         = ${initial_investment:10,.2f}")
+        print(f"Total S&P 500 Benchmark    = ${benchmark_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, benchmark_result_total, start, end)
+        print(f"Total Portfolio            = ${portfolio_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, portfolio_result_total, start, end)
+        print(f"Total Portfolio Rebalanced = ${rebalanced_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, rebalanced_result_total, start, end)
+        print("Holdings:")
 
-    print("\n")
+        # Print holdings table
+        _print_holdings_table(
+            portfolio,
+            portfolio_data,
+            start,
+            end,
+            initial_investment,
+        )
 
-    # Calculated the sum of the portfolio holdings (weighted by the number of shares per holding)
-    ticker_cols = [fund.ticker for fund in portfolio.holdings]
-    num_cols = [get_numshares_column(ticker) for ticker in ticker_cols]
-    # -- Create dataframes for total, rebalanced, and benchmark
-    # Forward fill columns individually, multiply them, then sum
-    df_left = portfolio_data[ticker_cols].ffill().fillna(0)
-    df_right = portfolio_data[num_cols].ffill().fillna(0)
-    total_portfolio = pd.DataFrame(index=portfolio_data.index)
-    total_portfolio["Total"] = (df_left.values * df_right.values).sum(axis=1)
-    total_portfolio["Series"] = portfolio.name  # Add an explicit distinguishing tracking label to each
+        print("\n")
 
-    # Calculated the sum of the portfolio holdings (rebalanced yearly)
-    ticker_cols = [fund.ticker for fund in portfolio.holdings]
-    num_cols = [get_numrebalancedshares_column(ticker) for ticker in ticker_cols]
-    df_left = portfolio_data[ticker_cols].ffill().fillna(0)
-    df_right = portfolio_data[num_cols].ffill().fillna(0)
-    total_rebalanced = pd.DataFrame(index=portfolio_data.index)
-    total_rebalanced["Total"] = (df_left.values * df_right.values).sum(axis=1)
-    total_rebalanced["Series"] = portfolio.name + ": Rebalanced"  # Add an explicit distinguishing tracking label to each
+    totals_portfolio = []
+    totals_rebalanced = []
+
+    for portfolio, portfolio_data in zip(portfolios, portfolios_data, strict=True):
+        # Calculated the sum of the portfolio holdings (weighted by the number of shares per holding)
+        ticker_cols = [fund.ticker for fund in portfolio.holdings]
+        num_cols = [get_numshares_column(ticker) for ticker in ticker_cols]
+        # -- Create dataframes for total, rebalanced, and benchmark
+        # Forward fill columns individually, multiply them, then sum
+        df_left = portfolio_data[ticker_cols].ffill().fillna(0)
+        df_right = portfolio_data[num_cols].ffill().fillna(0)
+        total_portfolio = pd.DataFrame(index=portfolio_data.index)
+        total_portfolio["Total"] = (df_left.values * df_right.values).sum(axis=1)
+        total_portfolio["Series"] = portfolio.name  # Add an explicit distinguishing tracking label to each
+        totals_portfolio.append(total_portfolio)
+
+        # Calculated the sum of the portfolio holdings (rebalanced yearly)
+        ticker_cols = [fund.ticker for fund in portfolio.holdings]
+        num_cols = [get_numrebalancedshares_column(ticker) for ticker in ticker_cols]
+        df_left = portfolio_data[ticker_cols].ffill().fillna(0)
+        df_right = portfolio_data[num_cols].ffill().fillna(0)
+        total_rebalanced = pd.DataFrame(index=portfolio_data.index)
+        total_rebalanced["Total"] = (df_left.values * df_right.values).sum(axis=1)
+        total_rebalanced["Series"] = portfolio.name + ": Rebalanced"  # Add an explicit distinguishing tracking label to each
+        totals_rebalanced.append(total_rebalanced)
 
     # Calculated the sum of the benchmark portfolio holdings
     ticker_cols = [fund.ticker for fund in benchmark_portfolio.holdings]
@@ -241,7 +250,7 @@ def plot_results(
     # Concatenate them row-wise into one unified DataFrame
     # Run .reset_index() to make the index an accessible column
     # By default, pandas names the index column "index", but we have chosen "Date" above.
-    combined = pd.concat([total_portfolio, total_rebalanced, total_benchmark]).reset_index()
+    combined = pd.concat(totals_portfolio + totals_rebalanced + [total_benchmark]).reset_index()
 
     # Map the domain categories to your custom visual configurations
     def first_value(df, column):
@@ -250,11 +259,10 @@ def plot_results(
         else:
             return df[column].loc[df[column].first_valid_index()]
 
-    custom_domain = [
-        first_value(total_benchmark, "Series"),
-        first_value(total_portfolio, "Series"),
-        first_value(total_rebalanced, "Series"),
-    ]
+    custom_domain = [first_value(total_benchmark, "Series"),]
+    for total_portfolio, total_rebalanced in zip(totals_portfolio, totals_rebalanced, strict=True):
+        custom_domain.append(first_value(total_portfolio, "Series"))
+        custom_domain.append(first_value(total_rebalanced, "Series"))
 
     chart = (
         alt.Chart(combined)
@@ -284,7 +292,7 @@ def plot_results(
         )
         .properties(
             title=f"Portfolio: {portfolio.name}",
-            width=640,
+            width="container",
             height=480,
         )
     )

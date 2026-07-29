@@ -144,8 +144,8 @@ class TestPlotResults:
         start, end = sample_dates
 
         chart = plot_results(
-            sample_portfolio,
-            sample_portfolio_data,
+            [sample_portfolio],
+            [sample_portfolio_data],
             benchmark_portfolio,
             sample_benchmark_data,
             start,

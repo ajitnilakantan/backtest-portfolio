@@ -17,7 +17,6 @@
 # [tool.uv.sources]
 # ///
 import marimo
-import altair
 
 # backtest = { path = "public/wheels/backtest-0.1.0-py3-none-any.whl" }
 __generated_with = "0.23.15"
@@ -82,14 +81,14 @@ def _(benchmarks, end, mo, portfolios, start):
         label="Benchmark:",
     )
     run_button = mo.ui.run_button(label="Run Backtest", kind="success")
-    exit_button = mo.ui.run_button(label="Shutdown Server", kind="danger")
+    # exit_button = mo.ui.run_button(label="Shutdown Server", kind="danger")
 
     controls = mo.vstack(
         [
             mo.hstack([start_date_picker, end_date_picker], justify="start"),
             mo.hstack([portfolio1_dropdown, portfolio2_dropdown], justify="start"),
             mo.hstack([benchmark_dropdown, run_button], justify="start"),
-            mo.hstack([exit_button], justify="start"),
+            # mo.hstack([exit_button], justify="start"),
         ]
     )
     controls  # noqa: B018 - final expression is the cell output
@@ -99,7 +98,7 @@ def _(benchmarks, end, mo, portfolios, start):
         portfolio1_dropdown,
         portfolio2_dropdown,
         run_button,
-        exit_button,
+        # exit_button,
         start_date_picker,
     )
 
@@ -127,12 +126,12 @@ def _(
     return
 
 
-@app.cell
-def _(exit_button, mo):
-    # This cell will run when the button is clicked
-    import os
-    if exit_button.value:
-        os._exit(0)
+# @app.cell
+# def _(exit_button, mo):
+#     # This cell will run when the button is clicked
+#     import os
+#     if exit_button.value:
+#         os._exit(0)
 
 
 if __name__ == "__main__":
