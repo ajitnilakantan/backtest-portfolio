@@ -1,6 +1,6 @@
 [project]
 description = "Backtest a stock portfolio"
-name = "backtest"
+name = "backtest-portfolio"
 requires-python = ">=3.14"
 version = "0.2.0"
 dependencies = [
@@ -40,13 +40,9 @@ build-backend = "uv_build"
 
 [tool.deptry]
 # To avoid: DEP003 'backtest' imported but it is a transitive dependency
-known_first_party = ["backtest"]
+known_first_party = ["backtest-portfolio"]
 # To avoid:  DEP004 'pytest' imported but declared as a dev dependency
 per_rule_ignores = { DEP004 = ["pytest"] }
-
-[tool.uv.build-backend]
-# If your code lives in src/my_custom_folder instead of src/[project_name]
-module-name = "backtest"
 
 [tool.pytest.ini_options]
 #pythonpath = ["./src"]

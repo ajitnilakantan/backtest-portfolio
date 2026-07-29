@@ -15,7 +15,7 @@ from InquirerPy.base.control import Choice
 # from backtest.holding import default_benchmark_portfolio, default_portfolios
 # from backtest.reporting import plot_results
 # from backtest import default_benchmark_portfolio, default_portfolios, download_portfolio_history, plot_results, rebalance_portfolio
-from backtest import Backtest, Portfolio
+from backtest_portfolio import Backtest, Portfolio
 
 
 def main():

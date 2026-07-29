@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from backtest.backtest import (
+from backtest_portfolio.backtest import (
     _allocate_shares_in_portfolio,
     _download_yahoo_finance_data,
     _normalize_percentage,
@@ -17,7 +17,7 @@ from backtest.backtest import (
     get_numshares_column,
     portfolio_value,
 )
-from backtest.holding import Holding, Portfolio, PortfolioType
+from backtest_portfolio.holding import Holding, Portfolio, PortfolioType
 
 EST = ZoneInfo("America/New_York")
 
@@ -69,7 +69,7 @@ class TestDownloadYahooFinanceData:
         start = datetime(2020, 1, 1, tzinfo=EST)
         end = datetime(2020, 1, 10, tzinfo=EST)
 
-        with patch("backtest.backtest.yf.Ticker") as mock_ticker:
+        with patch("backtest_portfolio.backtest.yf.Ticker") as mock_ticker:
             mock_instance = MagicMock()
             index = pd.date_range("2020-01-02", periods=5, freq="B", tz="UTC")
             mock_instance.history.return_value = pd.DataFrame(
@@ -115,8 +115,8 @@ class TestDownloadPortfolio:
         start, end = sample_dates
 
         with (
-            patch("backtest.backtest.DbCache") as cache_class,
-            patch("backtest.backtest._download_yahoo_finance_data") as download,
+            patch("backtest_portfolio.backtest.DbCache") as cache_class,
+            patch("backtest_portfolio.backtest._download_yahoo_finance_data") as download,
         ):
             cache = cache_class.return_value
             cache.get_min_max_dates.return_value = (None, None)

@@ -2,7 +2,7 @@
 # requires-python = ">=3.14"
 # dependencies = [
 #     "altair>=6.2.2",
-#     "backtest>=0.1.0",
+#     "backtest-portfolio>=0.1.0",
 #     "inquirerpy>=0.3.4",
 #     "ipython>=9.15.0",
 #     "ipywidgets>=8.1.8",
@@ -30,7 +30,7 @@ def _():
     import marimo as mo
     from dateutil.relativedelta import relativedelta
 
-    from backtest import Backtest, Portfolio
+    from backtest_portfolio import Backtest, Portfolio
 
     return Backtest, Portfolio, datetime, mo, relativedelta
 

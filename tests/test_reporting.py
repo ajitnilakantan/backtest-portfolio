@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import altair as alt
 import pytest
 
-from backtest.backtest import get_numrebalancedshares_column, portfolio_value
-from backtest.reporting import (
+from backtest_portfolio.backtest import get_numrebalancedshares_column, portfolio_value
+from backtest_portfolio.reporting import (
     _format_stats,
     _print_holdings_table,
     _print_stats,
