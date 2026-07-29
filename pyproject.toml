@@ -26,7 +26,6 @@ dev = [
     "jupyterlab>=4.6.2",
     "nbformat>=5.10.4",
     "perspective-python>=4.5.2",
-    "plotly>=6.9.0",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "ruff>=0.16.0",
