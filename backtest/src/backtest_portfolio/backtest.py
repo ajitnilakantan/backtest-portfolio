@@ -80,7 +80,7 @@ def _get_df_column_value(df: pd.DataFrame, at_date, column: str, default=0.0) ->
             position = 0  # Target precedes the first valid value
         return filled_series.iloc[position]
 
-    except IndexError, KeyError, ValueError:
+    except (IndexError, KeyError, ValueError):
         return default
 
 
@@ -388,3 +388,76 @@ def download_portfolio(
     portfolio_data = _rebalance_portfolio(portfolio, portfolio_data, start, end)
 
     return portfolio_data
+
+"""
+def portfolio_summary(
+    portfolio: Portfolio,
+    portfolio_data: pd.DataFrame,
+    start: datetime,
+    end: datetime,
+    initial_investment: float,
+) -> None:
+    # Compute totals
+    portfolio_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=False, at_date=end)
+    rebalanced_result_total, _ = portfolio_value(portfolio, portfolio_data, rebalanced=True, at_date=end)
+    benchmark_result_total, _ = portfolio_value(benchmark_portfolio, benchmark_data, rebalanced=False, at_date=end)
+
+        # Print summary stats
+        print(f"===Portfolio: {portfolio.name}===")
+        print(f"From {start.date()} to {end.date()}")
+        print("")
+
+        print(f"Initial Investment         = ${initial_investment:10,.2f}")
+        print(f"Total S&P 500 Benchmark    = ${benchmark_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, benchmark_result_total, start, end)
+        print(f"Total Portfolio            = ${portfolio_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, portfolio_result_total, start, end)
+        print(f"Total Portfolio Rebalanced = ${rebalanced_result_total:10,.2f}", end="")
+        _print_stats(initial_investment, rebalanced_result_total, start, end)
+        print("Holdings:")
+
+def portfolio_summary(
+    portfolio: Portfolio,
+    portfolio_data: pd.DataFrame,
+    start: datetime,
+    end: datetime,
+    initial_investment: float,
+) -> None:
+    ""Print a detailed holdings breakdown table comparing original and rebalanced portfolios.
+
+    Args:
+        portfolio: Portfolio object containing holdings information.
+        portfolio_data: DataFrame with portfolio asset prices by date.
+        portfolio_num_shares: DataFrame with portfolio share counts by date.
+        rebalanced_num_shares: DataFrame with rebalanced share counts by date.
+        start: Start date for the report period.
+        end: End date for the report period.
+        initial_investment: Initial investment amount used for percentage calculations.
+
+    Returns:
+        None
+    ""
+    print("                      Book           Percent       Current           Annualized Rebalanced           Annualized")
+    print("    Holding          Value   #Shares Portfolio       Value   #Shares Return%        Yearly   #Shares Return%")
+    for fund in portfolio.holdings:
+        book_value, book_num_share = portfolio_value(portfolio, portfolio_data, rebalanced=False, at_date=start, ticker=fund.ticker)
+        current_value, current_num_share = portfolio_value(portfolio, portfolio_data, rebalanced=False, at_date=end, ticker=fund.ticker)
+        current_rb_value, current_rb_num_share = portfolio_value(portfolio, portfolio_data, rebalanced=True, at_date=end, ticker=fund.ticker)
+        book_str = "{:13,.2f}$ {:9.1f}".format(book_value, book_num_share)
+        current_str = "{:13,.2f}$ {:9.1f}".format(current_value, current_num_share)
+        current_rb_str = "{:13,.2f}$ {:9.1f}".format(current_rb_value, current_rb_num_share)
+        book_percent = book_value / initial_investment * 100
+        current_change = 100 * get_annualized_return(book_value, current_value, start, end)
+        current_rb_change = 100 * get_annualized_return(book_value, current_rb_value, start, end)
+        print(
+            "{:>11} {:s} {:>5.1f}% {:s} {:>5.1f}% {:s} {:>5.1f}%".format(
+                fund.ticker,
+                book_str,
+                book_percent,
+                current_str,
+                current_change,
+                current_rb_str,
+                current_rb_change,
+            )
+        )
+"""

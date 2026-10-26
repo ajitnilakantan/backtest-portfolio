@@ -1,0 +1,68 @@
+[project]
+name = "backtest-dash"
+version = "0.3.0"
+description = "A portfolio backtesting and financial research workbench built with Dash"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "dash>=2.14.0",
+    "dash-bootstrap-components>=1.5.0",
+    "plotly>=5.18.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "yfinance>=0.2.30",
+    "waitress>=3.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2",
+    "coverage>=7.6.0",
+    "ruff>=0.12.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+testfolio_dash = ["benchmarks.json"]
+
+[tool.setuptools.data-files]
+"." = ["benchmarks.json"]
+
+# The repository-level app.py/db_cache.py files remain compatibility launchers.
+# The installable library is the testfolio_dash package.
+
+# Public package data is copied into the package during builds.
+
+[tool.setuptools.exclude-package-data]
+testfolio_dash = ["*.pyc"]
+
+# Keep package discovery explicit for the standalone library.
+
+[tool.setuptools.packages.find]
+include = ["testfolio_dash*"]
+
+[project.scripts]
+backtest-dash = "testfolio_dash.application:run"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+exclude = [".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["app", "db_cache", "testfolio_dash"]
+omit = ["test_*.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

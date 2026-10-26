@@ -53,6 +53,14 @@ uv run --with pytomlcleaner pytomlcleaner
 uv run --with validate-pyproject validate-pyproject pyproject.toml
 ```
 
+* Publish to PyPI
+```bash
+uv build
+# Get token from  PyPI.org / Account Settings > API tokens.
+export UV_PUBLISH_TOKEN="your-pypi-token"
+uv publish
+```
+
 * AI related
 ```bash
 # Adding marimo skills
@@ -97,7 +105,7 @@ For future reference:
 
 ```bash
 # Marimo py files ignore pyproject.toml dependencies, so manually add them:
-uv add --script .\notebooks\backtest_marimo.py altair inquirerpy ipython ipywidgets itables marimo numpy pandas python-dateutil tabulate yfinance backtest
+uv add --script ./notebooks/backtest_marimo.py altair inquirerpy ipython ipywidgets itables marimo numpy pandas python-dateutil tabulate yfinance backtest
 
 # Export to an html/wasm project
 uv run --with backtest  marimo export html-wasm --output marimo_export/ --mode run --sandbox --force notebooks/backtest_marimo.py

@@ -1,0 +1,2 @@
+# Compatibility export only. pyproject.toml and uv.lock are authoritative.
+-e .
